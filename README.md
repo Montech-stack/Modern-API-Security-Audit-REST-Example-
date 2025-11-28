@@ -1,43 +1,41 @@
-# ⚙️ OWASP Top 10 Vulnerability Assessment: Juice Shop Target
+# 🔐 Modern API Security Audit: User Management REST Service
 
 ### 📝 Executive Summary
 
-This security assessment targeted the OWASP Juice Shop application and identified **12 High and Medium severity findings**, primarily related to **Injection Flaws** (SQLi, XSS) and **Broken Authentication**. These observed vulnerabilities present a significant risk of **data theft** and **unauthorized access**. Immediate remediation is critical to mitigate exposure to common, high-impact attacks (as defined by the current OWASP Top 10).
+The targeted REST API, which manages customer account information, was found to have a severe **Broken Object Level Authorization (BOLA)** flaw. This indicates a systemic failure to validate resource ownership on the server side. The overall risk is **High** because any authenticated user can view, modify, and delete data belonging to other accounts, leading to a high volume of sensitive user data exposure.
 
 ---
 
 ### 🎯 Scope and Methodology
 
-* **Target Application:** OWASP Juice Shop v1.x (Simulated Environment).
-* **Scope:** All public-facing login, registration, and product viewing pages (`/login`, `/register`, `/rest/products`).
-* **Testing Approach:** Black Box testing utilizing **Burp Suite Professional** for traffic interception and manual techniques focused on validating the top ten risks.
+* **Target:** REST API endpoints managing user profiles, orders, and payment methods (`/api/v2/user/{user_id}`, `/api/v2/orders/{order_id}`).
+* **Environment:** Development environment for the **User Management API v2.1**.
+* **Focus:** Testing the integrity of authorization (IDOR/BOLA) and authentication (JWT handling). Tools used were **Burp Suite** and **Postman**.
 
 ---
 
 ### 🔍 Key Findings Summary
 
-| ID | Finding Title | Severity | Location | OWASP Category |
+| ID | Finding Title | Severity | Endpoint Tested | Remediation Focus |
 | :--- | :--- | :--- | :--- | :--- |
-| **JS-01** | **Unauthenticated SQL Injection (Login Bypass)** | **Critical** | Login Form `email` parameter | A03: Injection |
-| **JS-02** | Stored Cross-Site Scripting (XSS) | High | Customer Feedback Form | A07: Identification and Auth Failures |
-| **JS-03** | Broken Function Level Authorization (BFLA) | Medium | `/api/users/{id}` endpoint | A01: Broken Access Control |
-| **JS-04** | Insecure Direct Object Reference (IDOR) | Medium | Order History Page | A01: Broken Access Control |
+| **API-01** | **Broken Object Level Authorization (BOLA)** | **Critical** | `GET /api/v2/user/{user_id}` | Middleware/Authorization Check |
+| **API-02** | Missing Rate Limiting on Login | High | `POST /api/v2/auth/login` | Infrastructure/API Gateway |
+| **API-03** | Sensitive Data Exposure in JWT Payload | Medium | `/api/v2/auth/token` | Token Design/Claims |
 
 ---
 
-### 🛠️ Finding Detail: Unauthenticated SQL Injection (JS-01)
+### 🛠️ Finding Detail: Broken Object Level Authorization (API-01)
 
 | Detail | |
 | :--- | :--- |
 | **Risk** | **Critical** |
-| **CVE/CWE** | CWE-89 (Improper Neutralization of Special Elements used in an SQL Command) |
-| **Impact** | Allows an **unauthenticated attacker** to bypass the login mechanism and gain full administrative access, leading to database exfiltration. |
+| **CVE/CWE** | CWE-285 (Improper Authorization) |
+| **Impact** | Allows an attacker to **enumerate and steal** the profiles of all users by manipulating the resource identifier (`user_id`) in the path. |
 
 #### Proof of Concept (PoC)
-1.  Navigate to the `/login` page.
-2.  In the **Email** field, enter the payload: `' OR 1=1 --`
-3.  In the **Password** field, enter any value (e.g., `password123`).
-4.  Submitting the form results in a successful login as the **first user** in the database (typically the administrator).
+1.  Log in as **User A** (ID: 101) and capture the valid **JWT token (Token A)**.
+2.  Use **Token A** in the request header to attempt to retrieve the data for **User B** (ID: 102).
+3.  The API successfully returns the sensitive profile data for User B (name, address, phone number).
 
 #### Request/Response Snippet
-> **Malicious Request:**
+> **Malicious Request (Attacker is User 101, targeting User 102):**
